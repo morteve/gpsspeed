@@ -10,7 +10,6 @@
     <h1>GPS Drivstofforbruk</h1>
     <div class="speed-display" id="speed">Henter hastighet...</div>
     <div class="fuel-display" id="fuel">Drivstofforbruk: 0.0 L/t</div>
-    <div class="fuel-accumulated" id="fuel-accumulated">Akkumulert forbruk: 0.0 L</div>
     <div class="distance-display" id="distance">Distanse: 0.0 km</div>
     <div class="fuel-per-distance" id="fuel-per-distance">Forbruk: 0.0 L/km</div>
 
@@ -24,6 +23,12 @@
                     <input type="number" class="rpm-input" value="850">
                     <label>Forbruk (L/t):</label>
                     <input type="number" class="fuel-input" value="0.8">
+                </div>
+                <div class="calibration-row">
+                    <label>RPM:</label>
+                    <input type="number" class="rpm-input" value="1500">
+                    <label>Forbruk (L/t):</label>
+                    <input type="number" class="fuel-input" value="3.5">
                 </div>
                 <div class="calibration-row">
                     <label>RPM:</label>
@@ -47,38 +52,62 @@
             <button type="button" id="calibrate-btn">Kalibrer</button>
         </form>
 
-        <button id="reset-distance">Nullstill distanse</button>
-        <button id="reset-fuel">Nullstill forbruk</button>
+        <label for="unit-select">Måleenhet:</label>
+        <select id="unit-select">
+            <option value="kmh">Km/t</option>
+            <option value="knots">Knop</option>
+        </select>
     </div>
 
     <button class="settings-icon" id="settings-icon">&#9881;</button>
 
+    <!-- Scripts -->
     <script>
-        const BASE_URL = "https://gpsspeed.onrender.com"; // Oppdater med riktig URL
-        let currentSpeed = 0;
+        // Velg drawer og settings-ikonet
+        const drawer = document.getElementById('drawer');
+        const settingsIcon = document.getElementById('settings-icon');
+
+        // Funksjon for å åpne/lukke drawer
+        settingsIcon.addEventListener('click', () => {
+            drawer.classList.toggle('open');
+        });
+
+        const BASE_URL = "https://gpsspeed.onrender.com";
+        let currentUnit = "kmh";
 
         const speedDisplay = document.getElementById("speed");
         const fuelDisplay = document.getElementById("fuel");
+        const distanceDisplay = document.getElementById("distance");
+        const fuelPerDistanceDisplay = document.getElementById("fuel-per-distance");
+        const unitSelect = document.getElementById("unit-select");
+
+        unitSelect.addEventListener("change", (e) => {
+            currentUnit = e.target.value;
+        });
+
+        function updateFuelAndDistance(rpm, speed) {
+            fetch(`${BASE_URL}/calculate?rpm=${rpm}&speed=${speed}&unit=${currentUnit}`)
+                .then(response => response.json())
+                .then(data => {
+                    const fuelPerHour = data.fuel_per_hour.toFixed(2);
+                    const fuelPerDistance = data.fuel_per_distance.toFixed(2);
+
+                    fuelDisplay.textContent = `Drivstofforbruk: ${fuelPerHour} L/t`;
+                    fuelPerDistanceDisplay.textContent = `Forbruk: ${fuelPerDistance} L/${currentUnit === "kmh" ? "km" : "nm"}`;
+                })
+                .catch(error => console.error("Feil ved beregning:", error));
+        }
 
         function startGPS() {
             if ("geolocation" in navigator) {
                 navigator.geolocation.watchPosition(
                     (position) => {
-                        const { speed } = position.coords;
-                        currentSpeed = speed ? speed * 3.6 : 0; // Konverter til km/t
-
-                        speedDisplay.textContent = `Hastighet: ${currentSpeed.toFixed(2)} km/t`;
-
-                        fetch(`${BASE_URL}/calculate?rpm=3200&speed=${currentSpeed}`)
-                            .then(response => response.json())
-                            .then(data => {
-                                fuelDisplay.textContent = `Drivstofforbruk: ${data.fuel.toFixed(2)} L/t`;
-                            })
-                            .catch(error => console.error("Feil ved beregning:", error));
+                        const speed = position.coords.speed ? position.coords.speed * 3.6 : 0; // Konverter til km/t
+                        const rpm = 3200; // Bruk verdi fra kalibrering eller manuelt valg
+                        speedDisplay.textContent = `Hastighet: ${speed.toFixed(2)} ${currentUnit}`;
+                        updateFuelAndDistance(rpm, speed);
                     },
-                    (error) => {
-                        console.error("GPS-feil:", error);
-                    },
+                    (error) => console.error("GPS-feil:", error),
                     { enableHighAccuracy: true }
                 );
             } else {
