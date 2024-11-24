@@ -1,0 +1,157 @@
+/* Globale stiler */
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin: 0;
+    padding: 0;
+    background-color: #121212;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* Drawer-stiler */
+.drawer {
+    position: fixed;
+    bottom: -400px; /* Startposisjon utenfor skjermen */
+    left: 0;
+    width: 100%;
+    max-width: 400px; /* Begrens bredde på maks 400px */
+    margin: 0 auto; /* Sentrer på større skjermer */
+    height: 400px;
+    background-color: #1e1e1e;
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    transition: bottom 0.3s ease; /* Jevn overgang */
+    overflow-y: auto; /* Rullbar ved behov */
+}
+
+.drawer.open {
+    bottom: 0; /* Når draweren åpnes */
+}
+
+.drawer h2 {
+    font-size: 1.5em;
+    margin-bottom: 20px;
+    text-align: center;
+    color: #ffffff;
+}
+
+/* Layout for kalibreringsfelter */
+.calibration-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Avstand mellom rader */
+    margin-bottom: 20px;
+}
+
+.calibration-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px; /* Avstand mellom kolonner */
+}
+
+.calibration-row label {
+    flex: 1;
+    text-align: left;
+    color: #ffffff;
+}
+
+.calibration-row input {
+    flex: 2;
+    padding: 5px;
+    font-size: 1em;
+    border: 1px solid #333;
+    border-radius: 5px;
+    background-color: #333;
+    color: #fff;
+}
+
+/* Knappestiler */
+#calibrate-btn, #reset-distance, #reset-fuel {
+    background-color: #1e88e5;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    font-size: 1em;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 10px;
+}
+
+#calibrate-btn:hover, #reset-distance:hover, #reset-fuel:hover {
+    background-color: #1565c0;
+}
+
+/* Nullstill drivstoff spesifikt */
+#reset-fuel {
+    background-color: #d9534f;
+}
+
+#reset-fuel:hover {
+    background-color: #c9302c;
+}
+
+/* Select-stiler */
+#unit-select {
+    padding: 10px;
+    font-size: 1em;
+    border-radius: 5px;
+    border: 1px solid #333;
+    background-color: #1e1e1e;
+    color: #ffffff;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Settings-knapp */
+.settings-icon {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background-color: #1e88e5;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 1.5em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+
+
+.speed-display, .fuel-display, .fuel-accumulated, .distance-display {
+    margin: 10px 0;
+    font-size: 1.2em;
+    color: #ffffff;
+}
+
+.error {
+    margin-top: 10px;
+    font-size: 1em;
+    color: red;
+}
+
+/* Responsiv design */
+@media (min-width: 768px) {
+    .drawer {
+        max-width: 400px; /* Hold bredde konsistent på desktop */
+    }
+
+    #calibrate-btn, #reset-distance, #reset-fuel, #unit-select {
+        max-width: 400px;
+        margin: 0 auto; /* Sentrer knappene */
+    }
+}

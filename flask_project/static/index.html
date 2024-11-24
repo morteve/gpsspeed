@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS Drivstofforbruk</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>GPS Drivstofforbruk</h1>
+    <div class="speed-display" id="speed">Henter hastighet...</div>
+    <div class="fuel-display" id="fuel">Drivstofforbruk: 0.0 L/t</div>
+    <div class="fuel-accumulated" id="fuel-accumulated">Akkumulert forbruk: 0.0 L</div>
+    <div class="distance-display" id="distance">Distanse: 0.0 km</div>
+    <div class="fuel-per-distance" id="fuel-per-distance">Forbruk: 0.0 L/km</div>
+
+    <!-- Settings Drawer -->
+    <div class="drawer" id="drawer">
+        <h2>Innstillinger</h2>
+        <form id="calibration-form">
+            <div class="calibration-fields">
+                <div class="calibration-row">
+                    <label>RPM:</label>
+                    <input type="number" class="rpm-input" value="850">
+                    <label>Forbruk (L/t):</label>
+                    <input type="number" class="fuel-input" value="0.8">
+                </div>
+                <div class="calibration-row">
+                    <label>RPM:</label>
+                    <input type="number" class="rpm-input" value="3200">
+                    <label>Forbruk (L/t):</label>
+                    <input type="number" class="fuel-input" value="10.0">
+                </div>
+                <div class="calibration-row">
+                    <label>RPM:</label>
+                    <input type="number" class="rpm-input" value="4500">
+                    <label>Forbruk (L/t):</label>
+                    <input type="number" class="fuel-input" value="16.0">
+                </div>
+                <div class="calibration-row">
+                    <label>RPM:</label>
+                    <input type="number" class="rpm-input" value="5850">
+                    <label>Forbruk (L/t):</label>
+                    <input type="number" class="fuel-input" value="22.5">
+                </div>
+            </div>
+            <button type="button" id="calibrate-btn">Kalibrer</button>
+        </form>
+
+        <div>
+            <label for="unit-select">Måleenhet:</label><br>
+            <select id="unit-select">
+                <option value="kmh">Km/t</option>
+                <option value="knots">Knop</option>
+            </select>
+        </div>
+
+        <button id="reset-distance">Nullstill distanse</button>
+        <button id="reset-fuel">Nullstill forbruk</button>
+    </div>
+
+    <button class="settings-icon" id="settings-icon">&#9881;</button>
+
+    <script>
+        const BASE_URL = "http://127.0.0.1:5000";
+        let totalDistance = 0;
+        let totalFuel = 0;
+        let unit = "kmh"; // Standard måleenhet
+        let gpsActive = false;
+
+        const drawer = document.getElementById('drawer');
+        const settingsIcon = document.getElementById('settings-icon');
+        settingsIcon.addEventListener('click', () => {
+            drawer.classList.toggle('open');
+        });
+
+        // Kalibreringsfunksjonalitet
+        document.getElementById('calibrate-btn').addEventListener('click', async () => {
+            const rpmInputs = document.querySelectorAll('.rpm-input');
+            const fuelInputs = document.querySelectorAll('.fuel-input');
+            const rpmValues = Array.from(rpmInputs).map(input => parseFloat(input.value));
+            const fuelValues = Array.from(fuelInputs).map(input => parseFloat(input.value));
+
+            try {
+                const response = await fetch(`${BASE_URL}/calibrate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ rpm: rpmValues, fuel: fuelValues }),
+                });
+                const result = await response.json();
+                alert(result.message || 'Kalibrering vellykket!');
+            } catch (error) {
+                alert('Kunne ikke kalibrere.');
+            }
+        });
+
+        // Simuler drivstoffberegning basert på GPS-status
+        setInterval(() => {
+            if (!gpsActive) {
+                setFuelConsumption(0); // Hvis GPS ikke er aktiv
+            } else if (totalDistance === 0) {
+                setFuelConsumption(getIdleFuel()); // Hvis ingen distanse
+            }
+            updateFuelPerDistance(); // Oppdater forbruk per distanse
+        }, 1000);
+
+        async function calculateFuel(rpm, durationInSeconds) {
+            try {
+                const response = await fetch(`${BASE_URL}/calculate?rpm=${rpm}`);
+                const result = await response.json();
+
+                const fuelRate = result.fuel; // L/t
+                setFuelConsumption(fuelRate);
+
+                totalFuel += (fuelRate / 3600) * durationInSeconds; // L/s
+                document.getElementById("fuel-accumulated").textContent = `Akkumulert forbruk: ${totalFuel.toFixed(2)} L`;
+            } catch (error) {
+                console.error("Feil ved beregning:", error);
+            }
+        }
+
+        function setFuelConsumption(fuelRate) {
+            document.getElementById("fuel").textContent = `Drivstofforbruk: ${fuelRate.toFixed(2)} L/t`;
+        }
+
+        function getIdleFuel() {
+            const fuelInputs = document.querySelectorAll('.fuel-input');
+            return parseFloat(fuelInputs[0].value) || 0; // Laveste turtall
+        }
+
+        function updateFuelPerDistance() {
+            const fuelPerDistance = totalDistance > 0 ? totalFuel / totalDistance : 0;
+            const unitText = unit === "kmh" ? "L/km" : "L/nm";
+            document.getElementById("fuel-per-distance").textContent = `Forbruk: ${fuelPerDistance.toFixed(2)} ${unitText}`;
+        }
+
+        document.getElementById('unit-select').addEventListener('change', (event) => {
+            unit = event.target.value;
+            updateFuelPerDistance(); // Oppdater visning av forbruk per distanse
+        });
+
+        document.getElementById('reset-distance').addEventListener('click', () => {
+            totalDistance = 0;
+            document.getElementById("distance").textContent = `Distanse: 0.0 ${unit === "kmh" ? "km" : "nm"}`;
+        });
+
+        document.getElementById('reset-fuel').addEventListener('click', () => {
+            totalFuel = 0;
+            document.getElementById("fuel-accumulated").textContent = "Akkumulert forbruk: 0.0 L";
+            updateFuelPerDistance(); // Nullstill forbruk per distanse
+        });
+    </script>
+</body>
+</html>
