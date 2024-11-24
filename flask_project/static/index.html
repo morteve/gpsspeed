@@ -19,25 +19,33 @@
         <h2>Innstillinger</h2>
         <form id="calibration-form">
             <div class="calibration-fields">
-                <!-- RPM and fuel input rows -->
                 <div class="calibration-row">
                     <label>RPM:</label>
                     <input type="number" class="rpm-input" value="850">
                     <label>Forbruk (L/t):</label>
                     <input type="number" class="fuel-input" value="0.8">
                 </div>
-                <!-- Flere rader for RPM og drivstoff -->
+                <div class="calibration-row">
+                    <label>RPM:</label>
+                    <input type="number" class="rpm-input" value="3200">
+                    <label>Forbruk (L/t):</label>
+                    <input type="number" class="fuel-input" value="10.0">
+                </div>
+                <div class="calibration-row">
+                    <label>RPM:</label>
+                    <input type="number" class="rpm-input" value="4500">
+                    <label>Forbruk (L/t):</label>
+                    <input type="number" class="fuel-input" value="16.0">
+                </div>
+                <div class="calibration-row">
+                    <label>RPM:</label>
+                    <input type="number" class="rpm-input" value="5850">
+                    <label>Forbruk (L/t):</label>
+                    <input type="number" class="fuel-input" value="22.5">
+                </div>
             </div>
             <button type="button" id="calibrate-btn">Kalibrer</button>
         </form>
-
-        <div>
-            <label for="unit-select">Måleenhet:</label><br>
-            <select id="unit-select">
-                <option value="kmh">Km/t</option>
-                <option value="knots">Knop</option>
-            </select>
-        </div>
 
         <button id="reset-distance">Nullstill distanse</button>
         <button id="reset-fuel">Nullstill forbruk</button>
@@ -47,47 +55,28 @@
 
     <script>
         const BASE_URL = "https://gpsspeed.onrender.com"; // Oppdater med riktig URL
-        let lastPosition = null;
-        let totalDistance = 0;
-        let totalFuel = 0;
-        let unit = "kmh";
-        let gpsActive = false;
+        let currentSpeed = 0;
 
         const speedDisplay = document.getElementById("speed");
-        const distanceDisplay = document.getElementById("distance");
         const fuelDisplay = document.getElementById("fuel");
 
-        // Åpne/lukke innstillinger
-        const drawer = document.getElementById('drawer');
-        document.getElementById('settings-icon').addEventListener('click', () => {
-            drawer.classList.toggle('open');
-        });
-
-        // Hent GPS-data
         function startGPS() {
             if ("geolocation" in navigator) {
                 navigator.geolocation.watchPosition(
                     (position) => {
-                        gpsActive = true;
+                        const { speed } = position.coords;
+                        currentSpeed = speed ? speed * 3.6 : 0; // Konverter til km/t
 
-                        const { latitude, longitude, speed } = position.coords;
-                        const timestamp = position.timestamp;
-
-                        let currentSpeed = speed ? speed * 3.6 : 0; // Konverter til km/t
-
-                        // Oppdater UI og send til backend
                         speedDisplay.textContent = `Hastighet: ${currentSpeed.toFixed(2)} km/t`;
 
                         fetch(`${BASE_URL}/calculate?rpm=3200&speed=${currentSpeed}`)
                             .then(response => response.json())
                             .then(data => {
-                                const fuelConsumption = data.fuel;
-                                fuelDisplay.textContent = `Drivstofforbruk: ${fuelConsumption.toFixed(2)} L/t`;
+                                fuelDisplay.textContent = `Drivstofforbruk: ${data.fuel.toFixed(2)} L/t`;
                             })
                             .catch(error => console.error("Feil ved beregning:", error));
                     },
                     (error) => {
-                        gpsActive = false;
                         console.error("GPS-feil:", error);
                     },
                     { enableHighAccuracy: true }

@@ -26,7 +26,6 @@ def serve_frontend():
 def calibrate():
     data = request.json  # Hent JSON-data fra forespørselen
     try:
-        # Valider at "rpm" og "fuel" finnes i dataene
         if "rpm" not in data or "fuel" not in data:
             raise ValueError("Data må inneholde 'rpm' og 'fuel'")
         if len(data["rpm"]) != len(data["fuel"]):
@@ -36,25 +35,21 @@ def calibrate():
         if any(r <= 0 for r in data["rpm"]):
             raise ValueError("RPM må være større enn 0")
 
-        # Oppdater globale kalibreringsdata
         calibration_data["rpm"] = data["rpm"]
         calibration_data["fuel"] = data["fuel"]
 
-        # Returner suksessrespons
         return jsonify({
             "status": "success",
             "message": "Kalibrering oppdatert",
             "data": data
         })
     except Exception as e:
-        # Returner feilmelding
         return jsonify({"status": "error", "message": str(e)}), 400
 
 # Endepunkt for beregning av drivstofforbruk
 @app.route("/calculate", methods=["GET"])
 def calculate():
     try:
-        # Hent RPM og hastighet fra spørringsparametere
         rpm = float(request.args.get("rpm", 850))
         speed = float(request.args.get("speed", 0))
 
@@ -63,15 +58,13 @@ def calculate():
         # Interpoler drivstofforbruk basert på RPM
         fuel = np.interp(rpm, calibration_data["rpm"], calibration_data["fuel"])
 
-        # Juster drivstofforbruk basert på hastighet (for eksempel, høyere hastighet kan gi lavere effektivitet)
-        if speed > 0:
-            fuel_efficiency_factor = 1 - (speed / 200)  # Juster 200 som maks hastighet
-            fuel = max(fuel * fuel_efficiency_factor, 0)
+        # Hvis hastigheten er 0, juster for tomgangsforbruk
+        if speed == 0:
+            idle_factor = 0.2  # Justeringsfaktor for tomgang
+            fuel *= idle_factor
 
-        # Returner beregnet drivstofforbruk
         return jsonify({"rpm": rpm, "speed": speed, "fuel": fuel})
     except Exception as e:
-        # Returner feilmelding
         return jsonify({"status": "error", "message": str(e)}), 400
 
 # Tjen statiske filer direkte fra static-mappen
@@ -81,5 +74,5 @@ def serve_static_files(path):
 
 if __name__ == "__main__":
     import os
-    port = int(os.environ.get("PORT", 5000))  # Standard til 5000 hvis ingen PORT er satt
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
