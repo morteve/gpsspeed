@@ -69,5 +69,5 @@ if __name__ == "__main__":
 import os
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Standardport er 5000 hvis PORT ikke er satt
+    port = int(os.environ.get("PORT", 5000))  # Standard til 5000 hvis ingen PORT er satt
     app.run(host="0.0.0.0", port=port)
