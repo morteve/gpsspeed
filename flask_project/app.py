@@ -65,3 +65,9 @@ def serve_static_files(path):
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+import os
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))  # Standardport er 5000 hvis PORT ikke er satt
+    app.run(host="0.0.0.0", port=port)
