@@ -52,18 +52,27 @@ def calculate():
     try:
         rpm = float(request.args.get("rpm", 850))
         speed = float(request.args.get("speed", 0))
+        unit = request.args.get("unit", "kmh")  # Enhet: kmh eller knots
 
-        logging.debug(f"RPM: {rpm}, Speed: {speed}")
+        logging.debug(f"RPM: {rpm}, Speed: {speed}, Unit: {unit}")
 
         # Interpoler drivstofforbruk basert på RPM
-        fuel = np.interp(rpm, calibration_data["rpm"], calibration_data["fuel"])
+        fuel_per_hour = np.interp(rpm, calibration_data["rpm"], calibration_data["fuel"])
 
-        # Hvis hastigheten er 0, juster for tomgangsforbruk
-        if speed == 0:
-            idle_factor = 0.2  # Justeringsfaktor for tomgang
-            fuel *= idle_factor
+        # Konverter hastighet til riktig enhet
+        if unit == "knots":  # Konverter km/t til knop
+            speed /= 1.852
 
-        return jsonify({"rpm": rpm, "speed": speed, "fuel": fuel})
+        # Beregn drivstofforbruk per distanse (L/km eller L/nm)
+        fuel_per_distance = fuel_per_hour / max(speed, 1e-5)  # Unngå deling på null
+
+        return jsonify({
+            "rpm": rpm,
+            "speed": speed,
+            "unit": unit,
+            "fuel_per_hour": fuel_per_hour,
+            "fuel_per_distance": fuel_per_distance
+        })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
 

@@ -13,27 +13,25 @@ body {
     min-height: 100vh;
     overflow-x: hidden;
 }
-
-/* Drawer-stiler */
 .drawer {
     position: fixed;
-    bottom: -400px; /* Startposisjon utenfor skjermen */
+    bottom: -400px; /* Skjult utenfor skjermen */
     left: 0;
     width: 100%;
-    max-width: 400px; /* Begrens bredde på maks 400px */
-    margin: 0 auto; /* Sentrer på større skjermer */
+    max-width: 400px;
+    margin: 0 auto;
     height: 400px;
     background-color: #1e1e1e;
     box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
     padding: 20px;
-    transition: bottom 0.3s ease; /* Jevn overgang */
-    overflow-y: auto; /* Rullbar ved behov */
+    transition: bottom 0.3s ease; /* Glatt overgang */
+    overflow-y: auto;
 }
 
 .drawer.open {
-    bottom: 0; /* Når draweren åpnes */
+    bottom: 0; /* Synlig når åpen */
 }
 
 .drawer h2 {
