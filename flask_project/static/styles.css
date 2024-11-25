@@ -111,3 +111,15 @@ body {
 #calibrate-btn:hover {
     background-color: #1565c0;
 }
+button {
+    background-color: #1e88e5;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 10px;
+}
+button:hover {
+    background-color: #1565c0;
+}
