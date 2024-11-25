@@ -1,12 +1,6 @@
 const BASE_URL = "https://gpsspeed.onrender.com";
 
-// Globale variabler
-let calibrationData = [
-    { rpm: 850, fuel: 0.8 },
-    { rpm: 3200, fuel: 10.0 },
-    { rpm: 4500, fuel: 16.0 },
-    { rpm: 5850, fuel: 22.5 }
-];
+
 let totalDistance = 0;
 let lastPosition = null;
 
@@ -22,24 +16,78 @@ const calibrationForm = document.getElementById('calibration-form');
 // Drawer-funksjonalitet
 settingsIcon.addEventListener('click', () => {
     drawer.classList.toggle('open');
-    populateCalibrationTable();
+    generateCalibrationTable();
 });
 
-// Fyll ut kalibreringstabell
-function populateCalibrationTable() {
-    const fieldsContainer = document.querySelector('.calibration-fields');
-    fieldsContainer.innerHTML = '';
-    calibrationData.forEach((row, index) => {
-        fieldsContainer.innerHTML += `
-            <div class="calibration-row">
-                <label>RPM:</label>
-                <input type="number" class="rpm-input" value="${row.rpm}" data-index="${index}">
-                <label>Forbruk (L/t):</label>
-                <input type="number" class="fuel-input" value="${row.fuel}" data-index="${index}">
-            </div>
+// Kalibreringsdata (default verdier)
+let calibrationData = [
+    { rpm: 850, speed: 0, fuel: 0.8 },
+    { rpm: 3200, speed: 20, fuel: 10.0 },
+    { rpm: 4500, speed: 40, fuel: 16.0 },
+    { rpm: 5850, speed: 60, fuel: 22.5 },
+];
+
+// Generer kalibreringstabell
+function generateCalibrationTable() {
+    const calibrationFields = document.querySelector(".calibration-fields");
+    calibrationFields.innerHTML = ""; // Tøm eksisterende innhold
+
+    calibrationData.forEach((data, index) => {
+        const row = document.createElement("div");
+        row.classList.add("calibration-row");
+
+        row.innerHTML = `
+            <label>RPM:</label>
+            <input type="number" class="rpm-input" value="${data.rpm}" data-index="${index}" data-field="rpm">
+            <label>Hastighet (km/t):</label>
+            <input type="number" class="speed-input" value="${data.speed}" data-index="${index}" data-field="speed">
+            <label>Forbruk (L/t):</label>
+            <input type="number" class="fuel-input" value="${data.fuel}" data-index="${index}" data-field="fuel">
         `;
+
+        calibrationFields.appendChild(row);
     });
 }
+
+// Oppdater kalibreringsdata ved brukerinput
+document.querySelector(".calibration-fields").addEventListener("input", (event) => {
+    const index = parseInt(event.target.dataset.index);
+    const field = event.target.dataset.field;
+    const value = parseFloat(event.target.value);
+
+    if (!isNaN(value) && index !== undefined && field) {
+        calibrationData[index][field] = value; // Oppdater den relevante egenskapen
+    } else {
+        console.warn("Ugyldig verdi ignorert:", event.target.value);
+    }
+});
+
+// Kalibrer data
+document.getElementById("calibrate-btn").addEventListener("click", () => {
+    const rpmValues = calibrationData.map(data => data.rpm);
+    const speedValues = calibrationData.map(data => data.speed);
+    const fuelValues = calibrationData.map(data => data.fuel);
+
+    fetch(`${BASE_URL}/calibrate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rpm: rpmValues, speed: speedValues, fuel: fuelValues })
+    })
+        .then(response => response.json())
+        .then(result => {
+            alert(result.message || "Kalibrering vellykket!");
+        })
+        .catch(error => {
+            alert("Feil ved kalibrering.");
+            console.error(error);
+        });
+});
+
+
+
+// Generer tabellen ved oppstart
+generateCalibrationTable();
+
 
 // Kalibrer og send data til serveren
 document.getElementById('calibrate-btn').addEventListener('click', () => {
@@ -67,6 +115,33 @@ document.getElementById('calibrate-btn').addEventListener('click', () => {
         alert('Feil ved kalibrering: ' + error.message);
     });
 });
+
+
+// Oppdater drivstofforbruk basert på hastighet
+function calculateFuelAndUpdate(speed) {
+    fetch(`${BASE_URL}/calculate?speed=${speed}&unit=kmh`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.fuel_per_hour && data.fuel_per_distance) {
+                document.getElementById("fuel").textContent = `Drivstofforbruk: ${data.fuel_per_hour.toFixed(2)} L/t`;
+                document.getElementById("fuel-per-distance").textContent = `Forbruk: ${data.fuel_per_distance.toFixed(2)} L/km`;
+            } else {
+                console.error("Ugyldig respons fra API:", data);
+            }
+        })
+        .catch(error => console.error("Feil ved beregning:", error));
+}
+
+// Oppdater basert på GPS hastighet
+function updateSpeedAndFuel(speed) {
+    const speedDisplay = document.getElementById("speed");
+    const formattedSpeed = unit === "kmh" ? speed * 3.6 : speed; // Konverter m/s til km/t eller knop
+
+    speedDisplay.textContent = `Hastighet: ${formattedSpeed.toFixed(2)} ${unit === "kmh" ? "km/t" : "knop"}`;
+
+    // Beregn drivstoff basert på hastighet
+    calculateFuelAndUpdate(formattedSpeed);
+}
 
 // Beregn hastighet basert på GPS-posisjon
 function calculateSpeed(position) {
@@ -97,37 +172,22 @@ function calculateSpeed(position) {
     return { speed: 0, distance: 0 };
 }
 
-// GPS overvåking
+// Start GPS-overvåkning
 function startGPS() {
     if ("geolocation" in navigator) {
         navigator.geolocation.watchPosition(
-            position => {
-                console.log('Position received:', position);
-
-                // Bruk calculateSpeed for fallback
-                let speed = position.coords.speed;
-
-                if (speed === null || speed === undefined) {
-                    const { speed: calculatedSpeed } = calculateSpeed(position);
-                    speed = calculatedSpeed;
-                } else {
-                    speed = speed * 3.6; // Konverter m/s til km/t
-                }
-
-                const rpm = 3200; // Standardverdi
-                speedDisplay.textContent = `Hastighet: ${speed.toFixed(2)} km/t`;
-                distanceDisplay.textContent = `Distanse: ${totalDistance.toFixed(2)} km`;
-
-                updateFuelAndDistance(rpm, speed);
+            (position) => {
+                const speed = position.coords.speed || 0; // Hastighet i m/s
+                updateSpeedAndFuel(speed);
             },
-            error => {
-                console.error('GPS-feil:', error);
-                speedDisplay.textContent = 'Feil ved henting av hastighet';
+            (error) => {
+                console.error("GPS-feil:", error);
+                document.getElementById("speed").textContent = "Henter hastighet...";
             },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            { enableHighAccuracy: true }
         );
     } else {
-        speedDisplay.textContent = 'Geolokasjon støttes ikke av enheten.';
+        console.error("GPS er ikke tilgjengelig.");
     }
 }
 
@@ -182,60 +242,53 @@ function updateFuelAndDistance(rpm, speed) {
 
 
 
-// Start GPS
-
 function startGPS() {
     if ("geolocation" in navigator) {
         navigator.geolocation.watchPosition(
-            position => {
-                console.log('Position received:', position); // Logg hele posisjonsobjektet
-                console.log('Raw speed (m/s):', position.coords.speed); // Logg hastighet fra posisjonsdata
+            (position) => {
+                console.log("Position received:", position); // Log hele posisjonsobjektet
+                console.log("Raw speed (m/s):", position.coords.speed); // Log hastighet fra posisjonsdata
 
-                // Prøv å hente hastighet
                 let speed = position.coords.speed;
 
-                // Hvis speed ikke er tilgjengelig, beregn manuelt basert på forflytning
+                // Hvis hastighet ikke er tilgjengelig, beregn manuelt eller bruk fallback
                 if (speed === null || speed === undefined) {
                     const { speed: calculatedSpeed } = calculateSpeed(position);
-                    speed = calculatedSpeed;
+                    speed = calculatedSpeed || 0; // Fallback til 0 hvis beregning også feiler
                 } else {
-                    // Konverter hastighet fra m/s til km/t
+                    // Konverter m/s til km/t
                     speed = speed * 3.6;
                 }
-                console.log('Final speed (km/h):', speed); // Logg endelig hastighet som vises
+                console.log("Final speed (km/h):", speed); // Log endelig hastighet
 
-                const rpm = 3200; // Standardverdi for testing
-
-                // Oppdater visninger
+                // Oppdater visning av hastighet
                 speedDisplay.textContent = `Hastighet: ${speed.toFixed(2)} km/t`;
-                distanceDisplay.textContent = `Distanse: ${totalDistance.toFixed(2)} km`;
 
                 // Oppdater drivstoff og distanse
-                updateFuelAndDistance(rpm, speed);
+                updateFuelAndDistance(speed);
             },
-            error => {
-                let errorMessage = 'Feil ved henting av hastighet';
+            (error) => {
+                let errorMessage = "Feil ved henting av hastighet";
 
-                // Spesifikke feilmeldinger
                 switch (error.code) {
                     case error.PERMISSION_DENIED:
-                        errorMessage = 'Tilgang til GPS er avvist.';
+                        errorMessage = "Tilgang til GPS er avvist.";
                         break;
                     case error.POSITION_UNAVAILABLE:
-                        errorMessage = 'GPS-posisjon ikke tilgjengelig.';
+                        errorMessage = "GPS-posisjon ikke tilgjengelig.";
                         break;
                     case error.TIMEOUT:
-                        errorMessage = 'GPS-forespørselen tok for lang tid.';
+                        errorMessage = "GPS-forespørselen tok for lang tid.";
                         break;
                 }
 
                 console.error(errorMessage);
                 speedDisplay.textContent = errorMessage;
-                console.error('Geolocation error:', error); // Logg detaljer om feilen
+                console.error("Geolocation error:", error); // Log detaljer om feilen
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     } else {
-        speedDisplay.textContent = 'Geolokasjon støttes ikke av enheten.';
+        speedDisplay.textContent = "Geolokasjon støttes ikke av enheten.";
     }
 }

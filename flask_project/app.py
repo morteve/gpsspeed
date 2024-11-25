@@ -13,7 +13,8 @@ logging.basicConfig(level=logging.DEBUG)
 # Globale kalibreringsdata (standardverdier)
 calibration_data = {
     "rpm": [850, 3200, 4500, 5850],
-    "fuel": [0.8, 10.0, 16.0, 22.5]
+    "fuel": [0.8, 10.0, 16.0, 22.5],
+    "speed": [0, 20, 40, 60]
 }
 
 # Hjemmerute for å serve index.html fra static-mappen
@@ -50,24 +51,25 @@ def calibrate():
         logging.error(f"Kalibreringsfeil: {e}")
         return jsonify({"status": "error", "message": str(e)}), 400
 
-# Endepunkt for beregning av drivstofforbruk
 @app.route("/calculate", methods=["GET"])
 def calculate():
     try:
-        rpm = float(request.args.get("rpm", 850))
-        speed = float(request.args.get("speed", 0))
+        speed = float(request.args.get("speed", 0))  # Hastighet i km/t
         unit = request.args.get("unit", "kmh")  # Enhet: "kmh" eller "knots"
 
-        logging.debug(f"RPM: {rpm}, Speed: {speed}, Unit: {unit}")
+        # Konverter hastighet til km/t hvis nødvendig
+        if unit == "knots":
+            speed *= 1.852
 
-        # Interpoler drivstofforbruk basert på RPM
+        # Beregn RPM som lineær funksjon av hastighet
+        min_speed, max_speed = min(calibration_data["speed"]), max(calibration_data["speed"])
+        min_rpm, max_rpm = min(calibration_data["rpm"]), max(calibration_data["rpm"])
+        rpm = np.interp(speed, calibration_data["speed"], calibration_data["rpm"])  # Interpoler RPM basert på hastighet
+
+        # Interpoler drivstofforbruk basert på beregnet RPM
         fuel_per_hour = np.interp(rpm, calibration_data["rpm"], calibration_data["fuel"])
 
-        # Konverter hastighet til riktig enhet
-        if unit == "knots":  # Konverter km/t til knop
-            speed /= 1.852
-
-        # Beregn drivstofforbruk per distanse (L/km eller L/nm)
+        # Beregn drivstofforbruk per distanse (L/km)
         fuel_per_distance = fuel_per_hour / max(speed, 1e-5)  # Unngå deling på null
 
         return jsonify({
@@ -80,6 +82,8 @@ def calculate():
     except Exception as e:
         logging.error(f"Beregning feilet: {e}")
         return jsonify({"status": "error", "message": str(e)}), 400
+
+
 
 # Serve statiske filer direkte fra static-mappen
 @app.route('/<path:path>')
