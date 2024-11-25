@@ -68,28 +68,28 @@ document.getElementById('calibrate-btn').addEventListener('click', () => {
     });
 });
 
-// GPS og beregning
+// Beregn hastighet basert på GPS-posisjon
 function calculateSpeed(position) {
     const { latitude, longitude } = position.coords;
     const currentTime = position.timestamp;
 
-    console.log('New position:', { latitude, longitude, currentTime }); // Logg ny posisjon
+    console.log('New position:', { latitude, longitude, currentTime });
 
     if (lastPosition) {
         const { latitude: lastLat, longitude: lastLon, time: lastTime } = lastPosition;
-        console.log('Last position:', { lastLat, lastLon, lastTime }); // Logg forrige posisjon
+        console.log('Last position:', { lastLat, lastLon, lastTime });
 
         const distance = haversineDistance(lastLat, lastLon, latitude, longitude); // km
-        console.log('Distance moved (km):', distance); // Logg beregnet distanse
+        console.log('Distance moved (km):', distance);
 
         const timeElapsed = (currentTime - lastTime) / 1000 / 3600; // timer
-        console.log('Time elapsed (hours):', timeElapsed); // Logg tid brukt
+        console.log('Time elapsed (hours):', timeElapsed);
 
         const speed = distance / timeElapsed; // km/t
-        console.log('Calculated speed (km/h):', speed); // Logg beregnet hastighet
-
+        console.log('Calculated speed (km/h):', speed);
 
         totalDistance += distance;
+        lastPosition = { latitude, longitude, time: currentTime };
         return { speed, distance };
     }
 
@@ -97,8 +97,43 @@ function calculateSpeed(position) {
     return { speed: 0, distance: 0 };
 }
 
+// GPS overvåking
+function startGPS() {
+    if ("geolocation" in navigator) {
+        navigator.geolocation.watchPosition(
+            position => {
+                console.log('Position received:', position);
+
+                // Bruk calculateSpeed for fallback
+                let speed = position.coords.speed;
+
+                if (speed === null || speed === undefined) {
+                    const { speed: calculatedSpeed } = calculateSpeed(position);
+                    speed = calculatedSpeed;
+                } else {
+                    speed = speed * 3.6; // Konverter m/s til km/t
+                }
+
+                const rpm = 3200; // Standardverdi
+                speedDisplay.textContent = `Hastighet: ${speed.toFixed(2)} km/t`;
+                distanceDisplay.textContent = `Distanse: ${totalDistance.toFixed(2)} km`;
+
+                updateFuelAndDistance(rpm, speed);
+            },
+            error => {
+                console.error('GPS-feil:', error);
+                speedDisplay.textContent = 'Feil ved henting av hastighet';
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    } else {
+        speedDisplay.textContent = 'Geolokasjon støttes ikke av enheten.';
+    }
+}
+
+// Haversine formel for avstand
 function haversineDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Jordens radius i km
+    const R = 6371; // Radiusen til jorden i km
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
 
@@ -110,53 +145,42 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function startGPS() {
-    if ("geolocation" in navigator) {
-        navigator.geolocation.watchPosition(
-            position => {
-                const { speed } = calculateSpeed(position);
-                const rpm = 3200; // Standardverdi
-
-                speedDisplay.textContent = `Hastighet: ${speed.toFixed(2)} km/t`;
-                distanceDisplay.textContent = `Distanse: ${totalDistance.toFixed(2)} km`;
-
-                updateFuelAndDistance(rpm, speed);
-            },
-            error => {
-                speedDisplay.textContent = 'Feil ved henting av hastighet';
-                console.error(error);
-            },
-            { enableHighAccuracy: true }
-        );
-    } else {
-        speedDisplay.textContent = 'Geolokasjon støttes ikke';
-    }
-}
-
+// Update fuel and distance
 function updateFuelAndDistance(rpm, speed) {
-    console.log('Updating fuel and distance with:', { rpm, speed }); // Logg inndata til API-kallet
+    console.log('Updating fuel and distance with:', { rpm, speed });
 
+    // Når hastighet ikke er mottatt (null eller undefined), sett drivstofforbruk til 0
+    if (speed === null || speed === undefined) {
+        console.log('Speed is null or undefined, setting fuel to 0.');
+        fuelDisplay.textContent = `Drivstofforbruk: 0.0 L/t`;
+        fuelPerDistanceDisplay.textContent = `Forbruk: - L/km (hastighet ikke tilgjengelig)`;
+        return;
+    }
+
+    // Når hastighet er 0, bruk oppdatert idle RPM
+    if (speed === 0) {
+        const idleRPM = Math.min(...calibrationData.map(d => d.rpm)); // Laveste RPM
+        const fuelAtIdleRPM = calibrationData.find(d => d.rpm === idleRPM)?.fuel || 0; // Oppdatert forbruk for laveste RPM
+        console.log('Speed is 0, using updated idle RPM:', { idleRPM, fuelAtIdleRPM });
+
+        fuelDisplay.textContent = `Drivstofforbruk: ${fuelAtIdleRPM.toFixed(2)} L/t`;
+        fuelPerDistanceDisplay.textContent = `Forbruk: - L/km (stoppet)`;
+        return;
+    }
+
+    // Når hastighet > 0, kall API for beregning
     fetch(`${BASE_URL}/calculate?rpm=${rpm}&speed=${speed}&unit=kmh`)
-
         .then(response => response.json())
-        console.log('API response:', response); // Logg rå API-respons
-        
         .then(data => {
+            console.log('API data (fuel calculations):', data);
+
             fuelDisplay.textContent = `Drivstofforbruk: ${data.fuel_per_hour.toFixed(2)} L/t`;
             fuelPerDistanceDisplay.textContent = `Forbruk: ${data.fuel_per_distance.toFixed(2)} L/km`;
         })
-        .catch(error => console.error('Feil ved beregning:', error));
+        .catch(error => console.error('Error in updateFuelAndDistance:', error));
 }
 
-// Nullstill knapper
-document.getElementById('reset-fuel').addEventListener('click', () => {
-    fuelDisplay.textContent = 'Drivstofforbruk: 0.0 L/t';
-});
 
-document.getElementById('reset-distance').addEventListener('click', () => {
-    totalDistance = 0;
-    distanceDisplay.textContent = 'Distanse: 0.0 km';
-});
 
 // Start GPS
 
