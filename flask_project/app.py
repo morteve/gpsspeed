@@ -5,18 +5,18 @@ import logging
 
 # Opprett Flask-applikasjonen
 app = Flask(__name__, static_url_path='', static_folder='static')
-CORS(app)  # Tillat CORS for å støtte forespørsler fra eksterne kilder
+CORS(app)  # Tillat CORS for eksterne forespørsler
 
 # Logging for debugging
 logging.basicConfig(level=logging.DEBUG)
 
-# Globale kalibreringsdata
+# Globale kalibreringsdata (standardverdier)
 calibration_data = {
     "rpm": [850, 3200, 4500, 5850],
     "fuel": [0.8, 10.0, 16.0, 22.5]
 }
 
-# Hjemmerute for å tjene index.html fra static-mappen
+# Hjemmerute for å serve index.html fra static-mappen
 @app.route("/")
 def serve_frontend():
     return send_from_directory("static", "index.html")
@@ -26,6 +26,7 @@ def serve_frontend():
 def calibrate():
     data = request.json  # Hent JSON-data fra forespørselen
     try:
+        # Valider data
         if "rpm" not in data or "fuel" not in data:
             raise ValueError("Data må inneholde 'rpm' og 'fuel'")
         if len(data["rpm"]) != len(data["fuel"]):
@@ -35,15 +36,18 @@ def calibrate():
         if any(r <= 0 for r in data["rpm"]):
             raise ValueError("RPM må være større enn 0")
 
+        # Oppdater globale kalibreringsdata
         calibration_data["rpm"] = data["rpm"]
         calibration_data["fuel"] = data["fuel"]
 
+        logging.info("Kalibrering oppdatert.")
         return jsonify({
             "status": "success",
             "message": "Kalibrering oppdatert",
-            "data": data
+            "data": calibration_data
         })
     except Exception as e:
+        logging.error(f"Kalibreringsfeil: {e}")
         return jsonify({"status": "error", "message": str(e)}), 400
 
 # Endepunkt for beregning av drivstofforbruk
@@ -52,7 +56,7 @@ def calculate():
     try:
         rpm = float(request.args.get("rpm", 850))
         speed = float(request.args.get("speed", 0))
-        unit = request.args.get("unit", "kmh")  # Enhet: kmh eller knots
+        unit = request.args.get("unit", "kmh")  # Enhet: "kmh" eller "knots"
 
         logging.debug(f"RPM: {rpm}, Speed: {speed}, Unit: {unit}")
 
@@ -74,9 +78,10 @@ def calculate():
             "fuel_per_distance": fuel_per_distance
         })
     except Exception as e:
+        logging.error(f"Beregning feilet: {e}")
         return jsonify({"status": "error", "message": str(e)}), 400
 
-# Tjen statiske filer direkte fra static-mappen
+# Serve statiske filer direkte fra static-mappen
 @app.route('/<path:path>')
 def serve_static_files(path):
     return send_from_directory("static", path)

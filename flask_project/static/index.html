@@ -12,42 +12,17 @@
     <div class="fuel-display" id="fuel">Drivstofforbruk: 0.0 L/t</div>
     <div class="distance-display" id="distance">Distanse: 0.0 km</div>
     <div class="fuel-per-distance" id="fuel-per-distance">Forbruk: 0.0 L/km</div>
+    <div>
+        <button id="reset-fuel">Nullstill Forbruk</button>
+        <button id="reset-distance">Nullstill Distanse</button>
+    </div>
 
     <!-- Settings Drawer -->
     <div class="drawer" id="drawer">
         <h2>Innstillinger</h2>
         <form id="calibration-form">
             <div class="calibration-fields">
-                <div class="calibration-row">
-                    <label>RPM:</label>
-                    <input type="number" class="rpm-input" value="850">
-                    <label>Forbruk (L/t):</label>
-                    <input type="number" class="fuel-input" value="0.8">
-                </div>
-                <div class="calibration-row">
-                    <label>RPM:</label>
-                    <input type="number" class="rpm-input" value="1500">
-                    <label>Forbruk (L/t):</label>
-                    <input type="number" class="fuel-input" value="3.5">
-                </div>
-                <div class="calibration-row">
-                    <label>RPM:</label>
-                    <input type="number" class="rpm-input" value="3200">
-                    <label>Forbruk (L/t):</label>
-                    <input type="number" class="fuel-input" value="10.0">
-                </div>
-                <div class="calibration-row">
-                    <label>RPM:</label>
-                    <input type="number" class="rpm-input" value="4500">
-                    <label>Forbruk (L/t):</label>
-                    <input type="number" class="fuel-input" value="16.0">
-                </div>
-                <div class="calibration-row">
-                    <label>RPM:</label>
-                    <input type="number" class="rpm-input" value="5850">
-                    <label>Forbruk (L/t):</label>
-                    <input type="number" class="fuel-input" value="22.5">
-                </div>
+                <!-- Dynamisk generert tabell fylles fra JS -->
             </div>
             <button type="button" id="calibrate-btn">Kalibrer</button>
         </form>
@@ -61,57 +36,98 @@
 
     <button class="settings-icon" id="settings-icon">&#9881;</button>
 
-    <!-- Scripts -->
     <script>
-        // Velg drawer og settings-ikonet
         const drawer = document.getElementById('drawer');
         const settingsIcon = document.getElementById('settings-icon');
+        const calibrationForm = document.getElementById('calibration-form');
+        const BASE_URL = "https://gpsspeed.onrender.com";
+        let calibrationData = [
+            { rpm: 850, fuel: 0.8 },
+            { rpm: 3200, fuel: 10.0 },
+            { rpm: 4500, fuel: 16.0 },
+            { rpm: 5850, fuel: 22.5 }
+        ];
 
-        // Funksjon for å åpne/lukke drawer
+        // Åpne/lukke drawer
         settingsIcon.addEventListener('click', () => {
             drawer.classList.toggle('open');
+            populateCalibrationTable();
         });
 
-        const BASE_URL = "https://gpsspeed.onrender.com";
-        let currentUnit = "kmh";
-
-        const speedDisplay = document.getElementById("speed");
-        const fuelDisplay = document.getElementById("fuel");
-        const distanceDisplay = document.getElementById("distance");
-        const fuelPerDistanceDisplay = document.getElementById("fuel-per-distance");
-        const unitSelect = document.getElementById("unit-select");
-
-        unitSelect.addEventListener("change", (e) => {
-            currentUnit = e.target.value;
-        });
-
-        function updateFuelAndDistance(rpm, speed) {
-            fetch(`${BASE_URL}/calculate?rpm=${rpm}&speed=${speed}&unit=${currentUnit}`)
-                .then(response => response.json())
-                .then(data => {
-                    const fuelPerHour = data.fuel_per_hour.toFixed(2);
-                    const fuelPerDistance = data.fuel_per_distance.toFixed(2);
-
-                    fuelDisplay.textContent = `Drivstofforbruk: ${fuelPerHour} L/t`;
-                    fuelPerDistanceDisplay.textContent = `Forbruk: ${fuelPerDistance} L/${currentUnit === "kmh" ? "km" : "nm"}`;
-                })
-                .catch(error => console.error("Feil ved beregning:", error));
+        // Oppdater tabellen i settings-drawer
+        function populateCalibrationTable() {
+            const fieldsContainer = document.querySelector('.calibration-fields');
+            fieldsContainer.innerHTML = ''; // Tøm eksisterende felt
+            calibrationData.forEach((row, index) => {
+                fieldsContainer.innerHTML += `
+                    <div class="calibration-row">
+                        <label>RPM:</label>
+                        <input type="number" class="rpm-input" value="${row.rpm}" data-index="${index}">
+                        <label>Forbruk (L/t):</label>
+                        <input type="number" class="fuel-input" value="${row.fuel}" data-index="${index}">
+                    </div>
+                `;
+            });
         }
 
+        // Kalibrer og oppdater serveren
+        document.getElementById('calibrate-btn').addEventListener('click', () => {
+            const rpmInputs = document.querySelectorAll('.rpm-input');
+            const fuelInputs = document.querySelectorAll('.fuel-input');
+
+            calibrationData = Array.from(rpmInputs).map((input, index) => ({
+                rpm: parseFloat(input.value),
+                fuel: parseFloat(fuelInputs[index].value)
+            }));
+
+            fetch(`${BASE_URL}/calibrate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    rpm: calibrationData.map(row => row.rpm),
+                    fuel: calibrationData.map(row => row.fuel)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message || 'Kalibrering fullført');
+            })
+            .catch(error => {
+                alert('Feil ved kalibrering: ' + error.message);
+            });
+        });
+
+        // Nullstill drivstoff og distanse
+        document.getElementById('reset-fuel').addEventListener('click', () => {
+            document.getElementById('fuel').textContent = 'Drivstofforbruk: 0.0 L/t';
+        });
+
+        document.getElementById('reset-distance').addEventListener('click', () => {
+            totalDistance = 0;
+            document.getElementById('distance').textContent = 'Distanse: 0.0 km';
+        });
+
+        // Start GPS overvåking
         function startGPS() {
             if ("geolocation" in navigator) {
                 navigator.geolocation.watchPosition(
-                    (position) => {
-                        const speed = position.coords.speed ? position.coords.speed * 3.6 : 0; // Konverter til km/t
-                        const rpm = 3200; // Bruk verdi fra kalibrering eller manuelt valg
-                        speedDisplay.textContent = `Hastighet: ${speed.toFixed(2)} ${currentUnit}`;
+                    position => {
+                        const { speed, distance } = calculateSpeed(position);
+                        const rpm = 3200; // Midlertidig standardverdi
+
+                        document.getElementById('speed').textContent = `Hastighet: ${speed.toFixed(2)} km/t`;
+                        document.getElementById('distance').textContent = `Distanse: ${totalDistance.toFixed(2)} km`;
+
                         updateFuelAndDistance(rpm, speed);
                     },
-                    (error) => console.error("GPS-feil:", error),
+                    error => {
+                        console.error('GPS-feil:', error);
+                        document.getElementById('speed').textContent = 'Feil ved henting av hastighet';
+                    },
                     { enableHighAccuracy: true }
                 );
             } else {
-                speedDisplay.textContent = "Geolokasjon støttes ikke.";
+                document.getElementById('speed').textContent = 'Geolokasjon støttes ikke';
             }
         }
 
